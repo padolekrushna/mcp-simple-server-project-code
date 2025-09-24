@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2023-10-26"
+  }
+}
+
+
+pip install fastapi uvicorn pydantic
+
+uvicorn server:app --reload --port 8000
+
+
+python client.py
