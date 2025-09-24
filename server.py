@@ -1,25 +1,39 @@
-
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+# server.py
+import logging
 from datetime import datetime
-from typing import List, Dict, Any
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
 
-app = FastAPI(title="Simple MCP Server", description="A minimal MCP server over HTTP")
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Store initialized state
+app = FastAPI(title="Simple MCP Server", description="Minimal MCP server over HTTP")
+
 initialized = False
 
 @app.post("/mcp")
 async def mcp_endpoint(request: Request):
     global initialized
-    body = await request.json()
+    logger.info("🟩 Received MCP request")
+    
+    try:
+        body = await request.json()
+        logger.info(f"📦 Request body: {body}")
+    except Exception as e:
+        logger.error(f"❌ Failed to parse JSON: {e}")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
     method = body.get("method")
     msg_id = body.get("id")
+    params = body.get("params", {})
+
+    logger.info(f"🔧 Method: {method}, ID: {msg_id}")
 
     if method == "initialize":
-        # Confirm protocol and advertise tools
+        logger.info("🚀 Handling 'initialize'")
         initialized = True
-        return JSONResponse({
+        response = {
             "jsonrpc": "2.0",
             "id": msg_id,
             "result": {
@@ -43,21 +57,27 @@ async def mcp_endpoint(request: Request):
                     ]
                 }
             }
-        })
+        }
+        logger.info("✅ Sending initialize response")
+        return JSONResponse(response)
 
     elif method == "callTool":
-        tool_name = body["params"]["name"]
-        args = body["params"].get("arguments", {})
+        logger.info("🛠️ Handling 'callTool'")
+        tool_name = params.get("name")
+        arguments = params.get("arguments", {})
 
         if tool_name == "get_current_time":
             now = datetime.now().isoformat()
             content = [{"type": "text", "text": f"Current time: {now}"}]
+            logger.info(f"🕒 Time tool result: {now}")
 
         elif tool_name == "echo":
-            msg = args.get("message", "no message")
+            msg = arguments.get("message", "no message")
             content = [{"type": "text", "text": f"You said: {msg}"}]
+            logger.info(f"🔁 Echo tool result: {msg}")
 
         else:
+            logger.warning(f"⚠️ Unknown tool: {tool_name}")
             content = [{"type": "text", "text": f"Tool '{tool_name}' not found."}]
             return JSONResponse({
                 "jsonrpc": "2.0",
@@ -65,15 +85,22 @@ async def mcp_endpoint(request: Request):
                 "result": {"content": content, "isError": True}
             })
 
-        return JSONResponse({
+        response = {
             "jsonrpc": "2.0",
             "id": msg_id,
             "result": {"content": content, "isError": False}
-        })
+        }
+        logger.info("✅ Sending tool response")
+        return JSONResponse(response)
 
     elif method == "notifications/initialized":
-        # Client notifies that it's done initializing
+        logger.info("🔔 Received 'notifications/initialized'")
+        # No response needed for notifications
         return JSONResponse({})
 
-    # Unknown method
-    return JSONResponse({"jsonrpc": "2.0", "error": {"code": -32601, "message": "Method not found"}})
+    else:
+        logger.warning(f"❓ Unknown method: {method}")
+        return JSONResponse({
+            "jsonrpc": "2.0",
+            "error": {"code": -32601, "message": "Method not found"}
+        })
