@@ -12,6 +12,16 @@ app = FastAPI(title="Simple MCP Server", description="Minimal MCP server over HT
 
 initialized = False
 
+# ✅ NEW: Root endpoint for Azure (shows friendly message)
+@app.get("/")
+def home():
+    return {
+        "status": "MCP Server is running!",
+        "mcp_endpoint": "/mcp",
+        "usage": "Send POST requests to /mcp with MCP JSON-RPC format"
+    }
+
+# Main MCP endpoint
 @app.post("/mcp")
 async def mcp_endpoint(request: Request):
     global initialized
@@ -95,7 +105,6 @@ async def mcp_endpoint(request: Request):
 
     elif method == "notifications/initialized":
         logger.info("🔔 Received 'notifications/initialized'")
-        # No response needed for notifications
         return JSONResponse({})
 
     else:
