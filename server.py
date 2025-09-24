@@ -1,44 +1,45 @@
 # server.py
 import logging
 from datetime import datetime
-from fastapi import FastAPI, Request, HTTPException
+from typing import Any, Optional
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Define MCP request structure for FastAPI docs
+class MCPRequest(BaseModel):
+    jsonrpc: str = "2.0"
+    id: Optional[int] = None
+    method: str
+    params: dict[str, Any]
+
 app = FastAPI(title="Simple MCP Server", description="Minimal MCP server over HTTP")
 
 initialized = False
 
-# ✅ NEW: Root endpoint for Azure (shows friendly message)
+# Root endpoint for Azure (shows friendly message)
 @app.get("/")
 def home():
     return {
         "status": "MCP Server is running!",
         "mcp_endpoint": "/mcp",
+        "docs": "/docs",
         "usage": "Send POST requests to /mcp with MCP JSON-RPC format"
     }
 
-# Main MCP endpoint
+# Main MCP endpoint with typed request
 @app.post("/mcp")
-async def mcp_endpoint(request: Request):
+async def mcp_endpoint(request: MCPRequest):
     global initialized
-    logger.info("🟩 Received MCP request")
+    logger.info(f"🟩 Received MCP request: method={request.method}, id={request.id}")
     
-    try:
-        body = await request.json()
-        logger.info(f"📦 Request body: {body}")
-    except Exception as e:
-        logger.error(f"❌ Failed to parse JSON: {e}")
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-    method = body.get("method")
-    msg_id = body.get("id")
-    params = body.get("params", {})
-
-    logger.info(f"🔧 Method: {method}, ID: {msg_id}")
+    method = request.method
+    msg_id = request.id
+    params = request.params
 
     if method == "initialize":
         logger.info("🚀 Handling 'initialize'")
